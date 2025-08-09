@@ -1,0 +1,116 @@
+import boto3
+from botocore.exceptions import ClientError
+
+# Initialize SageMaker client
+sagemaker_client = boto3.client('sagemaker', region_name='us-east-1')
+
+def delete_notebook_instances():
+    try:
+        response = sagemaker_client.list_notebook_instances()
+        notebooks = response.get('NotebookInstances', [])
+        if not notebooks:
+            print("No notebook instances found.")
+            return
+        for notebook in notebooks:
+            notebook_name = notebook['NotebookInstanceName']
+            notebook_status = notebook['NotebookInstanceStatus']
+            try:
+                if notebook_status in ['InService', 'Pending', 'Updating']:
+                    sagemaker_client.stop_notebook_instance(NotebookInstanceName=notebook_name)
+                    print(f"Stopping notebook instance: {notebook_name}")
+                    # Wait for notebook to stop
+                    sagemaker_client.get_waiter('notebook_instance_stopped').wait(NotebookInstanceName=notebook_name)
+                sagemaker_client.delete_notebook_instance(NotebookInstanceName=notebook_name)
+                print(f"Deleted notebook instance: {notebook_name}")
+            except ClientError as e:
+                error_code = e.response['Error']['Code']
+                print(f"Error deleting notebook instance {notebook_name}: {error_code} - {e.response['Error']['Message']}")
+    except ClientError as e:
+        print(f"Error listing notebook instances: {e.response['Error']['Code']} - {e.response['Error']['Message']}")
+
+def delete_endpoints():
+    try:
+        response = sagemaker_client.list_endpoints()
+        endpoints = response.get('Endpoints', [])
+        if not endpoints:
+            print("No endpoints found.")
+            return
+        for endpoint in endpoints:
+            endpoint_name = endpoint['EndpointName']
+            try:
+                sagemaker_client.delete_endpoint(EndpointName=endpoint_name)
+                print(f"Deleted endpoint: {endpoint_name}")
+            except ClientError as e:
+                error_code = e.response['Error']['Code']
+                print(f"Error deleting endpoint {endpoint_name}: {error_code} - {e.response['Error']['Message']}")
+    except ClientError as e:
+        print(f"Error listing endpoints: {e.response['Error']['Code']} - {e.response['Error']['Message']}")
+
+def delete_endpoint_configs():
+    try:
+        response = sagemaker_client.list_endpoint_configs()
+        configs = response.get('EndpointConfigs', [])
+        if not configs:
+            print("No endpoint configurations found.")
+            return
+        for config in configs:
+            config_name = config['EndpointConfigName']
+            try:
+                sagemaker_client.delete_endpoint_config(EndpointConfigName=config_name)
+                print(f"Deleted endpoint config: {config_name}")
+            except ClientError as e:
+                error_code = e.response['Error']['Code']
+                print(f"Error deleting endpoint config {config_name}: {error_code} - {e.response['Error']['Message']}")
+    except ClientError as e:
+        print(f"Error listing endpoint configs: {e.response['Error']['Code']} - {e.response['Error']['Message']}")
+
+def delete_models():
+    try:
+        response = sagemaker_client.list_models()
+        models = response.get('Models', [])
+        if not models:
+            print("No models found.")
+            return
+        for model in models:
+            model_name = model['ModelName']
+            try:
+                sagemaker_client.delete_model(ModelName=model_name)
+                print(f"Deleted model: {model_name}")
+            except ClientError as e:
+                error_code = e.response['Error']['Code']
+                print(f"Error deleting model {model_name}: {error_code} - {e.response['Error']['Message']}")
+    except ClientError as e:
+        print(f"Error listing models: {e.response['Error']['Code']} - {e.response['Error']['Message']}")
+
+def stop_and_delete_training_jobs():
+    try:
+        response = sagemaker_client.list_training_jobs()
+        training_jobs = response.get('TrainingJobSummaries', [])
+        if not training_jobs:
+            print("No training jobs found.")
+            return
+        for job in training_jobs:
+            job_name = job['TrainingJobName']
+            job_status = job['TrainingJobStatus']
+            try:
+                if job_status in ['InProgress', 'Stopping']:
+                    sagemaker_client.stop_training_job(TrainingJobName=job_name)
+                    print(f"Stopped training job: {job_name}")
+                print(f"Training job {job_name} (status: {job_status}) handled.")
+            except ClientError as e:
+                error_code = e.response['Error']['Code']
+                print(f"Error handling training job {job_name}: {error_code} - {e.response['Error']['Message']}")
+    except ClientError as e:
+        print(f"Error listing training jobs: {e.response['Error']['Code']} - {e.response['Error']['Message']}")
+
+def main():
+    print("Starting SageMaker resource cleanup...")
+    delete_endpoints()
+    delete_endpoint_configs()
+    delete_models()
+    stop_and_delete_training_jobs()
+    delete_notebook_instances()
+    print("SageMaker resource cleanup completed.")
+
+if __name__ == "__main__":
+    main()
